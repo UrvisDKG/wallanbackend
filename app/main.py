@@ -290,11 +290,20 @@ async def upload_image(
     # Read content properly for Async
     content = await file.read()
 
-    folder = Path(UPLOAD_BASE) / str(inspection_id)
-    folder.mkdir(parents=True, exist_ok=True)
-    local_image_path = folder / final_filename
-    local_image_path.write_bytes(content)
-    print(f"DEBUG: Saved local file {local_image_path}")
+    # Use /tmp on Render (ephemeral), local files/ directory otherwise
+    is_render = os.getenv("RENDER") is not None
+    base_path = "/tmp/inspections" if is_render else UPLOAD_BASE
+    
+    try:
+        folder = Path(base_path) / str(inspection_id)
+        folder.mkdir(parents=True, exist_ok=True)
+        local_image_path = folder / final_filename
+        local_image_path.write_bytes(content)
+        print(f"DEBUG: Saved local file {local_image_path}")
+    except Exception as e:
+        print(f"WARNING: Could not save local file: {e}. Continuing with Azure upload only.")
+        local_image_path = None
+
 
     azure_url = None
     if blob_service_client:
@@ -355,7 +364,7 @@ async def upload_image(
 
     similarity = 0.0
     label = "good"
-    if os.path.exists(IDEAL_PATH):
+    if local_image_path and os.path.exists(IDEAL_PATH) and os.path.exists(str(local_image_path)):
         similarity = structural_compare(IDEAL_PATH, str(local_image_path))
         label = "defective" if similarity < 0.9 else "good"
 
