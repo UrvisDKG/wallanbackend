@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+mysql-connector-python
+opencv-python-headless
+scikit-image
+numpy
+python-multipart
+python-dotenv
+azure-storage-blob
+aiofiles
