@@ -20,16 +20,30 @@ class MockCursor:
              # Simulate creating a user
              self.lastrowid = 123  # Mock User ID
         elif "SELECT ID FROM USERS" in query:
-             # Simulate finding a user (return None to force insert, or a tuple to simulate existing)
-             # Let's verify against a simple in-memory store if we want to be fancy, 
-             # but for "Invalid OTP/Server Error" fix, always succeeding is better.
-             pass 
-             # self._rows = [(123,)] # Use this to simulate "User Exists"
+             # Simulate finding a user
              self._rows = None      # Use this to simulate "New User" -> Insert path
         elif "INSERT INTO INSPECTIONS" in query:
              self.lastrowid = 555 # Mock Inspection ID
         elif "INSERT INTO INSPECTION_IMAGES" in query:
              pass
+        elif "INSERT INTO OTPS" in query:
+             # Mock OTP storage
+             # Params: (phone, otp, expires, otp, expires)
+             phone = params[0]
+             val = params[1]
+             # Store in the class-level dict for persistence across connections
+             MockConnection._mock_otps[phone] = val
+        elif "SELECT OTP" in query and "FROM OTPS" in query:
+             # Params: (phone,)
+             phone = params[0]
+             if phone in MockConnection._mock_otps:
+                 self._rows = (MockConnection._mock_otps[phone],)
+             else:
+                 self._rows = None
+        elif "DELETE FROM OTPS" in query:
+             phone = params[0]
+             if phone in MockConnection._mock_otps:
+                 del MockConnection._mock_otps[phone]
 
     def fetchone(self):
         return self._rows
@@ -38,6 +52,8 @@ class MockCursor:
         pass
 
 class MockConnection:
+    _mock_otps = {} # Shared class-level storage for Mock OTPs
+    
     def cursor(self):
         return MockCursor(self)
     
