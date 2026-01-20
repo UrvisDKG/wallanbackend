@@ -24,6 +24,8 @@ class MockCursor:
              self._rows = None      # Use this to simulate "New User" -> Insert path
         elif "INSERT INTO INSPECTIONS" in query:
              self.lastrowid = 555 # Mock Inspection ID
+        elif "CREATE TABLE" in query or "ALTER TABLE" in query:
+             pass 
         elif "INSERT INTO INSPECTION_IMAGES" in query:
              pass
         elif "INSERT INTO OTPS" in query:

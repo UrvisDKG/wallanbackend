@@ -230,14 +230,20 @@ async def start_inspection(user_id: str = Form(...)):
     
     # Needs 'inspections' table
     try:
-        # Check if table exists (mock db handles this loosely)
-        cur.execute("CREATE TABLE IF NOT EXISTS inspections (id INT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        # Upgrade to BIGINT if it's currently INT
+        cur.execute("CREATE TABLE IF NOT EXISTS inspections (id BIGINT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        # In case it already exists as INT, try to alter it
+        try:
+            cur.execute("ALTER TABLE inspections MODIFY COLUMN id BIGINT AUTO_INCREMENT")
+        except:
+             pass 
+
         cur.execute("INSERT INTO inspections (user_id) VALUES (%s)", (user_id,))
         conn.commit()
         inspection_id = cur.lastrowid
     except Exception as e:
         print(f"DB Error starting inspection: {e}")
-        # Fallback ID
+        # Fallback ID - using seconds fits in INT, but we use BIGINT anyway
         inspection_id = int(time.time())
     finally:
         cur.close()
@@ -374,8 +380,8 @@ async def upload_image(
     # Ensure table exists
     cur.execute("""
         CREATE TABLE IF NOT EXISTS inspection_images (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            inspection_id INT,
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            inspection_id BIGINT,
             image_type VARCHAR(50),
             image_path VARCHAR(500),
             similarity FLOAT,
@@ -383,6 +389,13 @@ async def upload_image(
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Migration: Try to alter if existing
+    try:
+        cur.execute("ALTER TABLE inspection_images MODIFY COLUMN id BIGINT AUTO_INCREMENT")
+        cur.execute("ALTER TABLE inspection_images MODIFY COLUMN inspection_id BIGINT")
+    except:
+        pass
+
     
     cur.execute(
         """
