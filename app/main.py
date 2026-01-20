@@ -515,4 +515,4 @@ async def db_status():
 
 @app.get("/")
 def root():
-    return {"status": "backend running", "version": "1.3.0"}
+    return {"status": "backend running", "version": "1.4.0"}
