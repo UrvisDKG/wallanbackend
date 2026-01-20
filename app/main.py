@@ -25,17 +25,17 @@ app = FastAPI()
 
 @app.post("/auth/request-otp")
 async def request_otp_endpoint(phone: str = Form(...)):
+    if phone != "0123456789":
+        raise HTTPException(status_code=400, detail="Only the authorized test number 0123456789 is allowed for now.")
+    
     otp = generate_otp(phone)
-    # The OTP is printed to stdout by generate_otp
     return {"message": "OTP sent", "otp": otp}
 
 @app.post("/auth/verify-otp")
 async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...)):
-    # otp is sent as string in formData in api.ts? 
-    # api.ts: formData.append('otp', otp.toString());
-    # So receiving as str or int is fine, but Form(...) usually comes as string unless typed.
-    # verify_otp expects int or string? otp.py verify_otp compares stringified versions.
-    
+    if phone != "0123456789":
+        raise HTTPException(status_code=403, detail="Unauthorized number.")
+        
     is_valid = verify_otp(phone, otp)
     if not is_valid:
         raise HTTPException(status_code=400, detail="Invalid OTP")

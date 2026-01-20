@@ -3,11 +3,11 @@ import time
 from app.database import get_connection
 
 def generate_otp(phone: str):
-    otp = random.randint(1000, 9999)
-    print(f"OTP for {phone}: {otp}", flush=True)
+    # Hardcoded OTP for current testing phase
+    otp = 1234
     
     # Store in Database for production safety (handles multi-worker/restart)
-    print(f"DEBUG: Storing OTP for {phone} in database", flush=True)
+    print(f"DEBUG: Storing OTP 1234 for {phone} in database", flush=True)
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -20,11 +20,10 @@ def generate_otp(phone: str):
             )
         """)
         
-        # Calculate expiry (e.g., 5 minutes from now)
-        # Using simple integer timestamp or DB expression
-        expires_at = int(time.time()) + 300 # 5 minutes
+        # Calculate expiry (e.g., 60 minutes for easy testing)
+        expires_at = int(time.time()) + 3600 
         
-        # Insert or Update (MySQL syntax)
+        # Insert or Update
         cur.execute("""
             INSERT INTO otps (phone, otp, expires_at) 
             VALUES (%s, %s, FROM_UNIXTIME(%s))
