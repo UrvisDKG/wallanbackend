@@ -82,8 +82,12 @@ def get_connection():
             val = val.strip().strip('"').strip("'")
         return val
 
+    host = get_config("DB_HOST")
+    if not host:
+        print("DEBUG: No DB_HOST found, using MOCK database.")
+        return MockConnection()
+
     try:
-        host = get_config("DB_HOST")
         user = get_config("DB_USER")
         password = get_config("DB_PASSWORD")
         database = get_config("DB_NAME")
@@ -94,21 +98,29 @@ def get_connection():
         except (ValueError, TypeError):
             port = 3306
 
-        print(f"DEBUG: Connecting to {host} as {user}...")
+        print(f"DEBUG: Attempting REAL DB connection to {host}...", flush=True)
         
+        # Azure MySQL Flexible Server often requires SSL.
+        # We try to connect. If it fails, we log why.
         conn = mysql.connector.connect(
             host=host,
             user=user,
             password=password,
             database=database,
             port=port,
-            # connection_timeout=10, # Standard param
-            # Azure flexible server often requires SSL. 
-            # If your server requires it, you might need a CA cert. 
-            # For testing, we can try without or add ssl_disabled=False if needed.
+            use_pure=True,  # Better compatibility for some environments
+            ssl_disabled=False # Try to use SSL if available
+            # If your server requires a specific CA file, it must be provided in DB_SSL_CA
+            # ssl_ca=get_config("DB_SSL_CA")
         )
-        return conn
+        
+        if conn.is_connected():
+            print(f"✅ CONNECTED to Real MySQL DB: {host}", flush=True)
+            return conn
+        else:
+            raise Exception("Connection technically succeeded but is_connected() is False")
+
     except Exception as err:
-        print(f"Database connection error: {err}")
-        print("Providing MOCK database fallback to prevent app crash.")
+        print(f"❌ Database connection error: {err}", flush=True)
+        print("Fallback: Using MOCK database to keep app running.", flush=True)
         return MockConnection()

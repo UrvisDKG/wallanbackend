@@ -1,43 +1,46 @@
 
 -- 1. Users Table
 CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     phone VARCHAR(20) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     full_name VARCHAR(100),
     role VARCHAR(20) DEFAULT 'driver'
 );
 
--- 2. Inspections Table
+-- 2. OTPS Table
+CREATE TABLE IF NOT EXISTS otps (
+    phone VARCHAR(20) PRIMARY KEY,
+    otp VARCHAR(6),
+    expires_at TIMESTAMP
+);
+
+-- 3. Inspections Table
 CREATE TABLE IF NOT EXISTS inspections (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY, -- Can handle Date.now() if passed as id, or auto-inc
+    user_id VARCHAR(255), -- Changed to VARCHAR to match app logic and allow flexibility
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(50) DEFAULT 'started', -- 'started', 'completed'
-    car_model VARCHAR(50),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    status VARCHAR(50) DEFAULT 'started',
+    car_model VARCHAR(50)
 );
 
--- 3. Inspection Images (Evidence) Table
+-- 4. Inspection Images Table
 CREATE TABLE IF NOT EXISTS inspection_images (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    inspection_id INT NOT NULL,
-    image_type VARCHAR(50) NOT NULL, -- 'front', 'back', 'damage1', etc.
-    image_path VARCHAR(255) NOT NULL, -- URL or local path
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    inspection_id BIGINT NOT NULL,
+    image_type VARCHAR(50) NOT NULL,
+    image_path VARCHAR(500) NOT NULL,
     similarity FLOAT DEFAULT 0.0,
-    label VARCHAR(20), -- 'good', 'defective'
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE
+    label VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. Submissions (Analysis Results) Table
--- Stores the JSON result from Gemini analysis
+-- 5. Submissions Table
 CREATE TABLE IF NOT EXISTS submissions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(255),
     car_model VARCHAR(50),
-    analysis_json JSON, -- Stores the full array of Gemini results
-    comparison_text TEXT, -- Stores the generated textual comparison
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    analysis_json JSON,
+    comparison_text TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -45,7 +45,7 @@ async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...)):
     cur = conn.cursor()
     
     try:
-        cur.execute("CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, phone VARCHAR(255))")
+        cur.execute("CREATE TABLE IF NOT EXISTS users (id BIGINT AUTO_INCREMENT PRIMARY KEY, phone VARCHAR(255))")
         cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
         result = cur.fetchone()
         
@@ -72,7 +72,7 @@ async def demo_login_endpoint():
     cur = conn.cursor()
     
     try:
-        cur.execute("CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, phone VARCHAR(255))")
+        cur.execute("CREATE TABLE IF NOT EXISTS users (id BIGINT AUTO_INCREMENT PRIMARY KEY, phone VARCHAR(255))")
         cur.execute("SELECT id FROM users WHERE phone = %s", (demo_phone,))
         result = cur.fetchone()
         
