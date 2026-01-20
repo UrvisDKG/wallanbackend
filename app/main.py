@@ -411,6 +411,7 @@ async def upload_image(
     # Ensure table exists
     try:
         cur.execute("SET FOREIGN_KEY_CHECKS = 0")
+        cur.execute("CREATE TABLE IF NOT EXISTS inspections (id BIGINT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS inspection_images (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -423,6 +424,7 @@ async def upload_image(
             )
         """)
         try:
+            cur.execute("ALTER TABLE inspections MODIFY COLUMN id BIGINT AUTO_INCREMENT")
             cur.execute("ALTER TABLE inspection_images MODIFY COLUMN id BIGINT AUTO_INCREMENT")
             cur.execute("ALTER TABLE inspection_images MODIFY COLUMN inspection_id BIGINT")
         except:
@@ -513,4 +515,4 @@ async def db_status():
 
 @app.get("/")
 def root():
-    return {"status": "backend running", "version": "1.1.0"}
+    return {"status": "backend running", "version": "1.3.0"}
