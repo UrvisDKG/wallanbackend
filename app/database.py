@@ -18,12 +18,12 @@ class MockCursor:
 
         if "INSERT INTO USERS" in query:
              # Simulate creating a user
-             self.lastrowid = 123  # Mock User ID
+             self.lastrowid = 999001  # Distinct Mock User ID
         elif "SELECT ID FROM USERS" in query:
              # Simulate finding a user
              self._rows = None      # Use this to simulate "New User" -> Insert path
         elif "INSERT INTO INSPECTIONS" in query:
-             self.lastrowid = 555 # Mock Inspection ID
+             self.lastrowid = 888001 # Distinct Mock Inspection ID
         elif "CREATE TABLE" in query or "ALTER TABLE" in query:
              pass 
         elif "INSERT INTO INSPECTION_IMAGES" in query:
@@ -60,10 +60,14 @@ class MockConnection:
         return MockCursor(self)
     
     def commit(self):
-        print("MOCK DB COMMIT")
+        print("MOCK DB COMMIT (In-Memory Only)")
         
     def close(self):
         pass
+
+    def is_mock(self):
+        return True
+
 # ------------------------------------
 
 def get_connection():

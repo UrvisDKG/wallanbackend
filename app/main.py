@@ -485,6 +485,27 @@ async def compare_images_endpoint(
         "diff_image_base64": diff_base64
     }
 
+@app.get("/db-status")
+async def db_status():
+    conn = get_connection()
+    status = {
+        "connection_mode": "MOCK" if hasattr(conn, 'is_mock') else "REAL",
+        "tables": [],
+        "error": None
+    }
+    
+    if status["connection_mode"] == "REAL":
+        try:
+            cur = conn.cursor()
+            cur.execute("SHOW TABLES")
+            status["tables"] = [t[0] for t in cur.fetchall()]
+            cur.close()
+        except Exception as e:
+            status["error"] = str(e)
+    
+    conn.close()
+    return status
+
 @app.get("/")
 def root():
-    return {"status": "backend running"}
+    return {"status": "backend running", "version": "1.1.0"}
