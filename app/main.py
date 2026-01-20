@@ -492,7 +492,7 @@ async def db_status():
     conn = get_connection()
     status = {
         "connection_mode": "MOCK" if hasattr(conn, 'is_mock') else "REAL",
-        "tables": [],
+        "tables": {},
         "error": None
     }
     
@@ -500,7 +500,10 @@ async def db_status():
         try:
             cur = conn.cursor()
             cur.execute("SHOW TABLES")
-            status["tables"] = [t[0] for t in cur.fetchall()]
+            table_names = [t[0] for t in cur.fetchall()]
+            for table in table_names:
+                cur.execute(f"DESCRIBE {table}")
+                status["tables"][table] = [col[0] for col in cur.fetchall()]
             cur.close()
         except Exception as e:
             status["error"] = str(e)
