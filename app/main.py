@@ -45,7 +45,11 @@ async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...)):
     cur = conn.cursor()
     
     try:
-        cur.execute("CREATE TABLE IF NOT EXISTS users (id BIGINT AUTO_INCREMENT PRIMARY KEY, phone VARCHAR(255))")
+        cur.execute("CREATE TABLE IF NOT EXISTS users (id BIGINT AUTO_INCREMENT PRIMARY KEY, phone VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        # Check if column phone is too small or missing BIGINT
+        try: cur.execute("ALTER TABLE users MODIFY COLUMN id BIGINT AUTO_INCREMENT")
+        except: pass
+        
         cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
         result = cur.fetchone()
         
@@ -254,8 +258,37 @@ async def start_inspection(user_id: str = Form(...)):
 @app.post("/submissions")
 async def submit_photos(submission: Dict[str, Any]):
     print(f"Received submission: {submission}")
-    # Expand here to save to DB
-    return {"status": "success", "message": "Submission received"}
+    import json
+    
+    user_id = submission.get("userId")
+    car_model = submission.get("carModel")
+    analysis_results = submission.get("analysisResults")
+    
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS submissions (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                user_id VARCHAR(255),
+                car_model VARCHAR(50),
+                analysis_json JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cur.execute(
+            "INSERT INTO submissions (user_id, car_model, analysis_json) VALUES (%s, %s, %s)",
+            (str(user_id), car_model, json.dumps(analysis_results))
+        )
+        conn.commit()
+        return {"status": "success", "submission_id": cur.lastrowid}
+    except Exception as e:
+        print(f"Error saving submission: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
 
 @app.delete("/photos/{photo_id}")
 async def delete_photo(photo_id: str):
