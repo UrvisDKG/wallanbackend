@@ -528,6 +528,28 @@ async def db_status():
     conn.close()
     return status
 
+@app.get("/db-view")
+async def db_view():
+    conn = get_connection()
+    data = {}
+    if hasattr(conn, 'is_mock'):
+        return {"mode": "MOCK", "data": "No real data in mock mode"}
+    
+    try:
+        cur = conn.cursor()
+        for table in ["users", "inspections", "inspection_images", "submissions", "otps"]:
+            try:
+                cur.execute(f"SELECT * FROM {table} ORDER BY 1 DESC LIMIT 5")
+                data[table] = cur.fetchall()
+            except:
+                data[table] = "Table error or empty"
+        cur.close()
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+    return data
+
 @app.get("/")
 def root():
-    return {"status": "backend running", "version": "1.4.0"}
+    return {"status": "backend running", "version": "1.5.0"}
