@@ -45,10 +45,11 @@ async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...)):
     cur = conn.cursor()
     
     try:
+        cur.execute("SET FOREIGN_KEY_CHECKS = 0")
         cur.execute("CREATE TABLE IF NOT EXISTS users (id BIGINT AUTO_INCREMENT PRIMARY KEY, phone VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-        # Check if column phone is too small or missing BIGINT
         try: cur.execute("ALTER TABLE users MODIFY COLUMN id BIGINT AUTO_INCREMENT")
         except: pass
+        cur.execute("SET FOREIGN_KEY_CHECKS = 1")
         
         cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
         result = cur.fetchone()
@@ -234,14 +235,11 @@ async def start_inspection(user_id: str = Form(...)):
     
     # Needs 'inspections' table
     try:
-        # Upgrade to BIGINT if it's currently INT
+        cur.execute("SET FOREIGN_KEY_CHECKS = 0")
         cur.execute("CREATE TABLE IF NOT EXISTS inspections (id BIGINT AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-        # In case it already exists as INT, try to alter it
-        try:
-            cur.execute("ALTER TABLE inspections MODIFY COLUMN id BIGINT AUTO_INCREMENT")
-        except:
-             pass 
-
+        try: cur.execute("ALTER TABLE inspections MODIFY COLUMN id BIGINT AUTO_INCREMENT")
+        except: pass 
+        cur.execute("SET FOREIGN_KEY_CHECKS = 1")
         cur.execute("INSERT INTO inspections (user_id) VALUES (%s)", (user_id,))
         conn.commit()
         inspection_id = cur.lastrowid
@@ -411,21 +409,25 @@ async def upload_image(
     cur = conn.cursor()
     
     # Ensure table exists
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS inspection_images (
-            id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            inspection_id BIGINT,
-            image_type VARCHAR(50),
-            image_path VARCHAR(500),
-            similarity FLOAT,
-            label VARCHAR(20),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    # Migration: Try to alter if existing
     try:
-        cur.execute("ALTER TABLE inspection_images MODIFY COLUMN id BIGINT AUTO_INCREMENT")
-        cur.execute("ALTER TABLE inspection_images MODIFY COLUMN inspection_id BIGINT")
+        cur.execute("SET FOREIGN_KEY_CHECKS = 0")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS inspection_images (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                inspection_id BIGINT,
+                image_type VARCHAR(50),
+                image_path VARCHAR(500),
+                similarity FLOAT,
+                label VARCHAR(20),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        try:
+            cur.execute("ALTER TABLE inspection_images MODIFY COLUMN id BIGINT AUTO_INCREMENT")
+            cur.execute("ALTER TABLE inspection_images MODIFY COLUMN inspection_id BIGINT")
+        except:
+            pass
+        cur.execute("SET FOREIGN_KEY_CHECKS = 1")
     except:
         pass
 
