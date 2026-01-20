@@ -68,24 +68,45 @@ def get_connection():
     # helper to get env or config
     def get_config(key, default=None):
         val = os.getenv(key)
-        if val: return val
-        try:
-            import config
-            return getattr(config, key, default)
-        except ImportError:
-            return default
+        if val is None:
+            try:
+                import config
+                val = getattr(config, key, default)
+            except ImportError:
+                val = default
+        
+        # Clean value (remove quotes and whitespace)
+        if isinstance(val, str):
+            val = val.strip().strip('"').strip("'")
+        return val
 
     try:
+        host = get_config("DB_HOST")
+        user = get_config("DB_USER")
+        password = get_config("DB_PASSWORD")
+        database = get_config("DB_NAME")
+        port_raw = get_config("DB_PORT", 3306)
+        
+        try:
+            port = int(port_raw)
+        except (ValueError, TypeError):
+            port = 3306
+
+        print(f"DEBUG: Connecting to {host} as {user}...")
+        
         conn = mysql.connector.connect(
-            host=get_config("DB_HOST"),
-            user=get_config("DB_USER"),
-            password=get_config("DB_PASSWORD"),
-            database=get_config("DB_NAME"),
-            port=int(get_config("DB_PORT", 3306))
-            # ssl_ca=os.getenv("DB_SSL_CA") 
+            host=host,
+            user=user,
+            password=password,
+            database=database,
+            port=port,
+            # connection_timeout=10, # Standard param
+            # Azure flexible server often requires SSL. 
+            # If your server requires it, you might need a CA cert. 
+            # For testing, we can try without or add ssl_disabled=False if needed.
         )
         return conn
-    except mysql.connector.Error as err:
-        print(f"Error connecting to database: {err}")
-        print("Falling back to MOCK database.")
+    except Exception as err:
+        print(f"Database connection error: {err}")
+        print("Providing MOCK database fallback to prevent app crash.")
         return MockConnection()
