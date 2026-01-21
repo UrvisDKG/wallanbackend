@@ -500,27 +500,14 @@ async def db_status():
     
     if status["connection_mode"] == "REAL":
         try:
-            cur = conn.cursor()
+            cur = conn.cursor(dictionary=True)
             cur.execute("SHOW TABLES")
-            table_names = [t[0] for t in cur.fetchall()]
+            table_rows = cur.fetchall()
+            table_names = [list(row.values())[0] for row in table_rows]
             
             for table in table_names:
-                # Get Count
-                cur.execute(f"SELECT COUNT(*) FROM {table}")
-                count = cur.fetchone()[0]
-                
-                # Get last row (if id exists)
-                last_row = None
-                try:
-                    cur.execute(f"SELECT * FROM {table} ORDER BY 1 DESC LIMIT 1")
-                    last_row = cur.fetchone()
-                except:
-                    pass
-                
-                status["tables"][table] = {
-                    "count": count,
-                    "latest_record": last_row
-                }
+                cur.execute(f"DESCRIBE {table}")
+                status["tables"][table] = cur.fetchall()
             cur.close()
         except Exception as e:
             status["error"] = str(e)
