@@ -539,4 +539,4 @@ async def db_view():
 
 @app.get("/")
 def root():
-    return {"status": "backend running", "version": "1.5.0"}
+    return {"status": "backend running", "version": "1.6.0"}
