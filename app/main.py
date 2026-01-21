@@ -32,7 +32,7 @@ async def request_otp_endpoint(phone: str = Form(...)):
     return {"message": "OTP sent", "otp": otp}
 
 @app.post("/auth/verify-otp")
-async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...)):
+async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...), name: str = Form(None)):
     if phone != "0123456789":
         raise HTTPException(status_code=403, detail="Unauthorized number.")
         
@@ -46,7 +46,17 @@ async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...)):
     
     try:
         cur.execute("SET FOREIGN_KEY_CHECKS = 0")
-        cur.execute("CREATE TABLE IF NOT EXISTS users (id BIGINT AUTO_INCREMENT PRIMARY KEY, phone VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY, 
+                phone VARCHAR(255), 
+                name VARCHAR(255),
+                email VARCHAR(255),
+                isVerified TINYINT DEFAULT 0,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        """)
         try: cur.execute("ALTER TABLE users MODIFY COLUMN id BIGINT AUTO_INCREMENT")
         except: pass
         cur.execute("SET FOREIGN_KEY_CHECKS = 1")
@@ -56,11 +66,19 @@ async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...)):
         
         if result:
             user_id = result[0]
+            # Update verification status, name and updatedAt
+            if name:
+                cur.execute("UPDATE users SET isVerified = 1, name = %s, updatedAt = CURRENT_TIMESTAMP WHERE id = %s", (name, user_id))
+            else:
+                cur.execute("UPDATE users SET isVerified = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = %s", (user_id,))
         else:
             # Create user
-            cur.execute("INSERT INTO users (phone) VALUES (%s)", (phone,))
-            conn.commit()
+            if name:
+                cur.execute("INSERT INTO users (phone, name, isVerified) VALUES (%s, %s, 1)", (phone, name))
+            else:
+                cur.execute("INSERT INTO users (phone, isVerified) VALUES (%s, 1)", (phone,))
             user_id = cur.lastrowid
+        conn.commit()
     except Exception as e:
         print(f"Database error during login: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -259,28 +277,66 @@ async def submit_photos(submission: Dict[str, Any]):
     import json
     
     user_id = submission.get("userId")
-    car_model = submission.get("carModel")
-    analysis_results = submission.get("analysisResults")
+    raw_car_model = submission.get("carModel") or "Unknown Vehicle"
+    analysis_results = submission.get("analysisResults") or []
+    
+    # Split car model into brand and model if possible
+    brand = "Unknown"
+    model = raw_car_model
+    if " " in raw_car_model:
+        parts = raw_car_model.split(" ", 1)
+        brand = parts[0]
+        model = parts[1]
+    
+    # Derive Summary and Score from AI results
+    summary_parts = []
+    total_score = 0
+    damage_count = 0
+    
+    severity_map = {"none": 0, "low": 25, "medium": 50, "high": 75, "critical": 100}
+    
+    for res in analysis_results:
+        summary_parts.append(f"{res.get('damageType', 'N/A')}: {res.get('description', '')}")
+        sev = res.get('severity', 'none').lower()
+        score = severity_map.get(sev, 0)
+        total_score += score
+        if res.get('hasDamage'):
+            damage_count += 1
+            
+    final_summary = " | ".join(summary_parts)
+    avg_score = total_score / len(analysis_results) if analysis_results else 0
     
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS submissions (
-                id BIGINT AUTO_INCREMENT PRIMARY KEY,
-                user_id VARCHAR(255),
-                car_model VARCHAR(50),
-                analysis_json JSON,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        # 1. Update/Create Car record
+        cur.execute("SELECT id FROM cars WHERE brand = %s AND model = %s AND userId = %s", (brand, model, user_id))
+        car_row = cur.fetchone()
+        if car_row:
+            car_id = car_row[0]
+        else:
+            cur.execute("INSERT INTO cars (userId, brand, model, carType) VALUES (%s, %s, %s, %s)", (user_id, brand, model, "Sedan"))
+            car_id = cur.lastrowid
+            
+        # 2. Create entry in 'reports' table
+        # id, carId, reportStage, damageScore, summary, createdAt
+        cur.execute("SELECT COUNT(*) FROM reports WHERE carId = %s", (car_id,))
+        stage = cur.fetchone()[0] + 1
         
         cur.execute(
-            "INSERT INTO submissions (user_id, car_model, analysis_json) VALUES (%s, %s, %s)",
-            (str(user_id), car_model, json.dumps(analysis_results))
+            "INSERT INTO reports (carId, reportStage, damageScore, summary) VALUES (%s, %s, %s, %s)",
+            (car_id, stage, avg_score, final_summary)
         )
+        report_id = cur.lastrowid
+        
+        # 3. Save to backup 'submissions' table
+        cur.execute(
+            "INSERT INTO submissions (user_id, car_model, analysis_json) VALUES (%s, %s, %s)",
+            (str(user_id), raw_car_model, json.dumps(analysis_results))
+        )
+        
         conn.commit()
-        return {"status": "success", "submission_id": cur.lastrowid}
+        return {"status": "success", "submission_id": cur.lastrowid, "report_id": report_id, "car_id": car_id}
     except Exception as e:
         print(f"Error saving submission: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -442,6 +498,25 @@ async def upload_image(
         """,
         (inspection_id, clean_image_type, azure_url, similarity, label)
     )
+
+    # --- NEW: Populate Legacy reportphotos table ---
+    try:
+        # Find angle_id from angleCode
+        cur.execute("SELECT id FROM carphotoangles WHERE LOWER(angleCode) = %s", (clean_image_type.lower(),))
+        angle_row = cur.fetchone()
+        angle_id = angle_row[0] if angle_row else 1 # Fallback to first angle
+        
+        cur.execute(
+            """
+            INSERT INTO reportphotos (reportId, angleId, photoUrl, aiAnalysis)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (inspection_id, angle_id, azure_url, label)
+        )
+    except Exception as e:
+        print(f"Legacy Sync Error (reportphotos): {e}")
+    # -----------------------------------------------
+
     conn.commit()
     cur.close()
     conn.close()
@@ -539,4 +614,4 @@ async def db_view():
 
 @app.get("/")
 def root():
-    return {"status": "backend running", "version": "1.6.0"}
+    return {"status": "backend running", "version": "1.7.0"}
