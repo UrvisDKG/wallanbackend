@@ -26,16 +26,18 @@ app = FastAPI()
 
 @app.post("/auth/request-otp")
 async def request_otp_endpoint(phone: str = Form(...)):
-    if phone != "0123456789":
-        raise HTTPException(status_code=400, detail="Only the authorized test number 0123456789 is allowed for now.")
+    # Only allow the specific test number
+    if phone != "+971 55 842 3197":
+        raise HTTPException(status_code=400, detail="Only the authorized number +971 55 842 3197 is allowed.")
     
     otp = generate_otp(phone)
     return {"message": "OTP sent", "otp": otp}
 
 @app.post("/auth/verify-otp")
 async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...), name: str = Form(None)):
-    if phone != "0123456789":
-        raise HTTPException(status_code=403, detail="Unauthorized number.")
+    # Only allow the specific test number
+    if phone != "+971 55 842 3197":
+        raise HTTPException(status_code=403, detail="Only the authorized number +971 55 842 3197 is allowed.")
         
     is_valid = verify_otp(phone, otp)
     if not is_valid:
@@ -91,7 +93,7 @@ async def verify_otp_endpoint(phone: str = Form(...), otp: str = Form(...), name
 
 @app.post("/auth/demo-login")
 async def demo_login_endpoint():
-    demo_phone = "1234567890"
+    demo_phone = "+971501234567"
     conn = get_connection()
     cur = conn.cursor()
     

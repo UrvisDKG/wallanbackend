@@ -4,10 +4,10 @@ from app.database import get_connection
 
 def generate_otp(phone: str):
     # Hardcoded OTP for current testing phase
-    otp = 1234
+    otp = 9755
     
     # Store in Database for production safety (handles multi-worker/restart)
-    print(f"DEBUG: Storing OTP 1234 for {phone} in database", flush=True)
+    print(f"DEBUG: Storing OTP 9755 for {phone} in database", flush=True)
     conn = get_connection()
     cur = conn.cursor()
     try:
